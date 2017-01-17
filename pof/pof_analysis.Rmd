@@ -1,0 +1,171 @@
+---
+title: "POF Analysis"
+author: "Matt Mingay"
+output:
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+```
+
+```{r, eval=F, include=F, echo=F}
+
+allpoff <- NULL
+
+url <- read_html("http://ca.pof.com/viewprofile.aspx?profile_id=137056285")
+
+for (i in 1:10000) {
+tryCatch({  
+  age = url %>% html_node("#age") %>%
+    html_text() 
+  username = url %>% html_node("#username") %>%
+    html_text()
+  fishtype = url %>% html_node("#fishtype") %>%
+    html_text() 
+  smoke = url %>% html_node("#smoke") %>%
+    html_text()
+  ethnicity = url %>% html_node("#ethnicity") %>%
+    html_text()
+  zodiac = url %>% html_node("#zodiac") %>%
+    html_text()
+  bodytype = url %>% html_node("#body") %>%
+    html_text()
+  temp <- data.frame(fishtype, smoke, age, username, ethnicity, zodiac, bodytype)
+  allpoff <- rbind(allpoff, temp)
+  urlb <- url %>% html_node("#image-bar > div:nth-child(1)") %>% html_node("a") %>%
+    html_attr("href") %>% gsub("\\\r.*", "", .) %>% paste0("http://ca.pof.com/", .)
+  url <- read_html(urlb)
+  })
+  cat(i, "..\r")
+}
+
+save(allpoff, file="~/Google Drive/github_share/allpoff_10k.txt")
+
+```
+
+##Filter duplicates
+
+```{r, cache.lazy=T}
+load(file="~/Google Drive/github_share/allpoff_10k.txt")
+```
+
+#####Number of lines in the collected data
+```{r}
+nrow(allpoff)
+```
+
+
+#####Number of lines with a unique username from collected data
+```{r}
+allpof <- tbl_df(allpoff) %>% unique()
+nrow(allpof)
+```
+
+> looks like there is some redundancy when using the image bar for browsing. Only 3475/10000 of users were unique.
+
+##Count number of different fishtype
+
+```{r, fig.width=7, fig.height=12}
+zprop <- tbl_df(allpof) %>% group_by(fishtype) %>% tally()
+ggplot(zprop, aes(reorder(fishtype, n), n))+geom_bar(stat="identity")+coord_flip()
+```
+
+```{r, eval=F, include=F}
+tbl_df(allpof) %>% group_by(fishtype) %>% tally() %>% arrange(n) %>% data.frame() %>% head(n=25)
+```
+
+> select those fishtypes with at least 10 occurences for easier downstream visualization 
+
+```{r}
+zprop <- tbl_df(allpof) %>% group_by(fishtype) %>% tally() %>% filter(n>9)
+```
+
+##Proportion of bodytypes within different fishtypes 
+
+```{r, fig.width=9, fig.height=5}
+
+tbl_df(allpof) %>% group_by(bodytype, fishtype) %>% tally() %>% inner_join(zprop, by="fishtype") %>% mutate(prop=(n.x/n.y)*100) %>% ggplot(aes(x=reorder(fishtype,prop), y=prop, fill=bodytype)) + geom_bar(stat="identity", position="stack") + coord_flip() + xlab('') + ylab("Percentage of Fish")
+
+```
+
+> It looks like gamers, geeks and straight edge women tend to carry a few extra pounds
+
+
+##Proportion of smoking status within different fishtypes
+
+```{r, fig.width=9, fig.height=5}
+tbl_df(allpof) %>% group_by(smoke, fishtype) %>% tally() %>% inner_join(zprop, by="fishtype") %>% mutate(prop=(n.x/n.y)*100) %>% ggplot(aes(x=reorder(fishtype,prop), y=prop, fill=smoke)) + geom_bar(stat="identity", position="stack") + coord_flip() + xlab('') + ylab("Percentage of Fish")
+```
+
+> It looks like hippies, daredevil and tatooed fish tend to smoke more often
+
+
+##Number of fish with different zodiacs
+
+```{r, fig.width=9, fig.height=5}
+tbl_df(allpof) %>% group_by(zodiac) %>% tally() %>% ggplot(aes(reorder(zodiac, n), n))+geom_bar(stat="identity")+coord_flip()
+zodn <- tbl_df(allpof) %>% group_by(zodiac) %>% tally()
+```
+
+> Running low on scorpio
+
+##Number of fish with different ethnicities
+
+```{r, fig.width=9, fig.height=5}
+tbl_df(allpof) %>% group_by(ethnicity) %>% tally() %>% ggplot(aes(reorder(ethnicity, n), n))+geom_bar(stat="identity")+coord_flip()
+```
+
+> The sea of fish seems to be dominated by caucasians
+
+##How is body type related to ethnicity?
+
+```{r, fig.width=9, fig.height=5}
+
+ethn <- tbl_df(allpof) %>% group_by(ethnicity) %>% tally()
+
+tbl_df(allpof) %>% group_by(bodytype, ethnicity) %>% tally() %>% inner_join(ethn, by="ethnicity") %>% mutate(prop=(n.x/n.y)*100) %>% ggplot(aes(x=ethnicity, y=prop, fill=bodytype)) + geom_bar(stat="identity", position="stack") + coord_flip() + ylab("Percentage of Fish")
+```
+
+##Proportion smokers within different bodytype classes
+
+```{r, fig.width=9, fig.height=5}
+
+bodn <- tbl_df(allpof) %>% group_by(bodytype) %>% tally() 
+
+tbl_df(allpof) %>% group_by(bodytype, smoke) %>% tally() %>% inner_join(bodn, by="bodytype") %>% mutate(prop=(n.x/n.y)*100) %>% arrange(-prop) %>% ggplot(aes(x=bodytype, y=prop, fill=smoke)) + geom_bar(stat="identity", position="stack") + coord_flip() + ylab("Percentage of Fish")
+
+```
+
+> I expected to see more thin people who smoke often but this doesn't seem to be the case
+
+
+#####minumum age
+```{r}
+#minumum age
+min(as.numeric(as.character(allpof$age)))
+```
+
+#####maximum age
+```{r}
+max(as.numeric(as.character(allpof$age)))
+```
+
+####Create and group fish into age ranges 
+
+```{r}
+agepof <- tbl_df(allpof) %>% mutate(agegroup=cut(as.numeric(as.character(age)), c(17,25,30,50)))
+agegro <- tbl_df(agepof) %>% group_by(agegroup) %>% tally()
+```
+
+##Proportion of bodytypes within different age groups 
+
+```{r, fig.width=9, fig.height=5}
+tbl_df(agepof) %>% group_by(bodytype, agegroup) %>% tally() %>% inner_join(agegro, by="agegroup") %>% mutate(prop=(n.x/n.y)*100) %>% ggplot(aes(x=reorder(agegroup,prop), y=prop, fill=bodytype)) + geom_bar(stat="identity", position="stack") + coord_flip() + xlab('') + ylab("Percentage of Fish")
+
+```
+
+> Age group doesn't seem to contribute very much to bodytype
