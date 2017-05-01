@@ -1,2 +1,4 @@
 # webscraping
-Reports summarizing playful analyses of data acquired through webscraping using the [vest](https://github.com/hadley/rvest) package
+
+Reports and tools for the analysis of cryptocurrency, genomics, and online dating datasets acquired using webscraping techniques in R and Python.
+

@@ -1,0 +1,52 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(rvest)
+```
+
+```{r}
+
+
+urls <- read.table("~/Downloads/mgsigdb.txt")
+alldesc <- NULL
+
+  for (i in 1:nrow(urls)) {
+tryCatch({  
+  url <- read_html(as.character(urls$V2[i]))
+  bdesc = url %>% html_node("tr:nth-child(3) td") %>% html_text() 
+  ident = urls$V1[i]
+  temp <- data.frame(ident, bdesc)
+  alldesc <- rbind(alldesc, temp)
+})
+  }
+
+
+write.csv(alldesc, "~/Google Drive/shiny_apps_online/vitaminc_shiny/vitc_rnaseq/all_gene_lists.csv")
+
+allg <- read.csv("~/Google Drive/shiny_apps_online/vitaminc_shiny/vitc_rnaseq/all_gene_lists.csv")[,2:3]
+
+x <- readLines("~/Downloads/msigdb.v5.2.symbols.gmt")
+y <- strsplit(x, split = "\t")
+z <- lapply(y, function(x) x[-c(1,2)])
+
+saveRDS(z, file = "~/Google Drive/shiny_apps_online/master_vitc/shinyVitaminC/msigdblists.rds")
+saveRDS(z, file = "~/Google Drive/shiny_apps_online/msigdb/msigdb2.rds")
+
+```
+
+```{r}
+
+allg <- read.csv("~/Google Drive/shiny_apps_online/vitaminc_shiny/vitc_rnaseq/all_gene_lists.csv", stringsAsFactors = F)[,2:3]
+allgb <- c(allg$ident)
+names(allgb) <- allg$bdesc
+allgl <- as.list(allgb)
+saveRDS(allgl, file = "~/Google Drive/shiny_apps_online/msigdb/msigdesc.rds")
+
+```
+
